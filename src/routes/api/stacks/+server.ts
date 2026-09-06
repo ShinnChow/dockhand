@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { listComposeStacks, deployStack, saveStackComposeFile, writeStackEnvFile, writeRawStackEnvFile, saveStackEnvVarsToDb } from '$lib/server/stacks';
 import { EnvironmentNotFoundError, DockerConnectionError } from '$lib/server/docker';
-import { upsertStackSource, getStackSources } from '$lib/server/db';
+import { upsertStackSource, getStackSources, secretProviderExists } from '$lib/server/db';
 import { authorize } from '$lib/server/authorize';
 import { auditStack } from '$lib/server/audit';
 import { createJobResponse } from '$lib/server/sse';
@@ -149,6 +149,12 @@ export const POST: RequestHandler = async (event) => {
 			return json({ error: 'Permission denied: binding a secret provider requires the secrets permission' }, { status: 403 });
 		}
 
+		// A stale provider id (provider deleted/recreated while the editor held the old
+		// list) would otherwise hit a raw foreign-key error on save (#1522).
+		if (typeof secretProviderId === 'number' && !(await secretProviderExists(secretProviderId))) {
+			return json({ error: 'The selected secret provider no longer exists. Reopen the stack and pick a current provider.' }, { status: 400 });
+		}
+
 		// If start is false, only create the compose file without deploying
 		if (start === false) {
 			const result = await saveStackComposeFile(name, compose, true, envIdNum, {
@@ -176,12 +182,13 @@ export const POST: RequestHandler = async (event) => {
 				}
 			}
 
-			// Record the stack as internally created with custom paths if provided
+			// Persist the path the file was actually written to (the default location
+			// when the caller omitted composePath), not null (#1515).
 			await upsertStackSource({
 				stackName: name,
 				environmentId: envIdNum,
 				sourceType: 'internal',
-				composePath: composePath || undefined,
+				composePath: composePath || result.composePath || undefined,
 				envPath: envPath || undefined,
 				secretProviderId,
 			});
@@ -218,12 +225,13 @@ export const POST: RequestHandler = async (event) => {
 			}
 		}
 
-		// Record the stack in DB before deploying - ensures it exists even if deploy fails
+		// Record the stack in DB before deploying - ensures it exists even if deploy fails.
+		// Persist the actual written path (default location when composePath omitted), not null (#1515).
 		await upsertStackSource({
 			stackName: name,
 			environmentId: envIdNum,
 			sourceType: 'internal',
-			composePath: composePath || undefined,
+			composePath: composePath || saveResult.composePath || undefined,
 			envPath: envPath || undefined,
 			secretProviderId
 		});

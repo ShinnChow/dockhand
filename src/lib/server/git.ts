@@ -21,6 +21,7 @@ import { sendEventNotification } from './notifications';
 import { buildBasicAuthHeader } from './git-auth';
 import { assertSafeRepoUrl, assertSafeGitRef, repoFilePath, repoBaseEnvPath } from './git-url-safety';
 import { assertSafeRepoTarget } from './git-branch-lookup';
+import { shouldDeployGitStack, shouldForceRecreateGitStack } from './git-deploy-policy';
 import { resolveStackBranch } from '../git-stack-branch';
 import {
 	parseManifest,
@@ -1348,10 +1349,14 @@ export async function deployGitStack(stackId: number, options?: { force?: boolea
 		console.log(`${logPrefix} Env file vars (masked):`, JSON.stringify(redactEnvVarsForLog(syncResult.envFileVars), null, 2));
 	}
 
-	// Check if there are changes - skip redeploy if no changes and not forced
-	// Note: For new stacks (first deploy), syncResult.updated will be true
-	// forceRedeploy setting overrides the skip logic for webhooks/scheduled syncs
-	const shouldDeploy = force || gitStack.forceRedeploy || syncResult.updated;
+	// Check if there are changes - skip redeploy if no changes and not forced.
+	// For new stacks (first deploy), syncResult.updated is true. The forceRedeploy
+	// setting overrides the skip logic for webhooks/scheduled syncs.
+	const shouldDeploy = shouldDeployGitStack({
+		force,
+		forceRedeploy: gitStack.forceRedeploy === true,
+		gitUpdated: syncResult.updated === true
+	});
 	if (!shouldDeploy) {
 		console.log(`${logPrefix} No changes detected and force=false, forceRedeploy=false, skipping redeploy`);
 		const skippedResult = {
@@ -1363,8 +1368,11 @@ export async function deployGitStack(stackId: number, options?: { force?: boolea
 		return skippedResult;
 	}
 
-	const forceRecreate = syncResult.updated;
-	console.log(`${logPrefix} Will force recreate:`, forceRecreate, `(updated=${syncResult.updated})`);
+	const forceRecreate = shouldForceRecreateGitStack({
+		forceRedeploy: gitStack.forceRedeploy === true,
+		gitUpdated: syncResult.updated === true
+	});
+	console.log(`${logPrefix} Will force recreate:`, forceRecreate, `(updated=${syncResult.updated}, forceRedeploy=${gitStack.forceRedeploy})`);
 	console.log(`${logPrefix} Build on deploy:`, gitStack.buildOnDeploy);
 	console.log(`${logPrefix} Re-pull images:`, gitStack.repullImages);
 	console.log(`${logPrefix} Force redeploy setting:`, gitStack.forceRedeploy);

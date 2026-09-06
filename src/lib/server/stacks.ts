@@ -47,6 +47,7 @@ import {
 	setStackInjectedSecretKeys
 } from './db';
 import { getProvider } from './secretproviders';
+import { stripSurroundingQuotes } from './secretproviders/shared';
 import { resolveComposeDockerHost, buildComposeBaseArgs } from './compose-docker-args';
 import { unregisterSchedule } from './scheduler';
 import { sendEventNotification } from './notifications';
@@ -803,7 +804,7 @@ export async function saveStackComposeFile(
 		oldEnvPath?: string;  // Old env file path for renaming
 		secretProviderId?: number | null;  // secret provider binding (undefined = unchanged)
 	}
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; composePath?: string }> {
 	// Validate stack name - Docker Compose requires lowercase alphanumeric, hyphens, underscores
 	// Must also start with a letter or number
 	if (!/^[a-z0-9][a-z0-9_-]*$/.test(name)) {
@@ -1002,7 +1003,10 @@ export async function saveStackComposeFile(
 
 	try {
 		writeFileSync(composeFile, content);
-		return { success: true };
+		// Return the path actually written so the caller can persist it even when it
+		// supplied no explicit composePath (else the stored path is null while the file
+		// exists at the default location - #1515).
+		return { success: true, composePath: composeFile };
 	} catch (err: any) {
 		return { success: false, error: `Failed to ${create ? 'create' : 'save'} compose file: ${err.message}` };
 	}
@@ -3055,9 +3059,19 @@ export async function deployStack(options: DeployStackOptions): Promise<StackOpe
 			if (source?.composePath) {
 				workingDir = dirname(source.composePath);
 				actualComposePath = source.composePath;
+				// envPath: a real path is used as-is; null/undefined (unset) falls back to
+				// the .env beside the compose file so its content (e.g. a bulk secret
+				// selector) still reaches resolveProviderEnvVars - same as the default-path
+				// branch below. An empty string means the user chose NO env file, so honor
+				// that and read none. Without the fallback, an internal stack whose
+				// composePath is now stored (#1515) but has an unset envPath would skip the
+				// .env entirely.
 				if (source.envPath) {
 					actualEnvPath = source.envPath;
+				} else if (source.envPath == null) {
+					actualEnvPath = join(workingDir, '.env');
 				}
+				// source.envPath === '' -> leave actualEnvPath undefined (no env file)
 				console.log(`${logPrefix} Using custom path from DB:`, workingDir);
 			} else {
 				// Default: compose file should already exist (written by saveStackComposeFile)
@@ -3545,20 +3559,24 @@ async function resolveProviderEnvVars(
 	// Only providers that support inline references detect any here.
 	const isRef = (value: unknown): value is string =>
 		provider?.supportsReferences ? provider.isReference(value) : false;
+	// The canonical reference string for lookup: surrounding quotes stripped so a value
+	// pasted straight from 1Password's "Copy Secret Reference" (which includes quotes)
+	// resolves the same as the bare op://... form (#1521). The STORED value is untouched.
+	const normalizeRef = (value: string): string => stripSurroundingQuotes(value);
 
 	const envFileRefs = new Map<string, string>();
 	for (const [key, value] of Object.entries(envFileVars)) {
 		if (isRef(value)) {
-			envFileRefs.set(key, value.trim());
+			envFileRefs.set(key, normalizeRef(value));
 		}
 	}
 
 	const refs = new Set<string>();
 	for (const value of Object.values(dbNonSecretVars)) {
-		if (isRef(value)) refs.add(value.trim());
+		if (isRef(value)) refs.add(normalizeRef(value));
 	}
 	for (const value of Object.values(secretVars)) {
-		if (isRef(value)) refs.add(value.trim());
+		if (isRef(value)) refs.add(normalizeRef(value));
 	}
 	for (const ref of envFileRefs.values()) refs.add(ref);
 
@@ -3584,7 +3602,7 @@ async function resolveProviderEnvVars(
 	let promotedFromDb = 0;
 	for (const [key, value] of Object.entries(dbNonSecretVars)) {
 		if (isRef(value)) {
-			const resolved = refMap.get(value.trim());
+			const resolved = refMap.get(normalizeRef(value));
 			if (resolved !== undefined) {
 				delete dbNonSecretVars[key];
 				secretVars[key] = resolved;
@@ -3594,7 +3612,7 @@ async function resolveProviderEnvVars(
 	}
 	for (const [key, value] of Object.entries(secretVars)) {
 		if (isRef(value)) {
-			const resolved = refMap.get(value.trim());
+			const resolved = refMap.get(normalizeRef(value));
 			if (resolved !== undefined) {
 				secretVars[key] = resolved;
 			}
