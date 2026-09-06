@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Dockhand API",
-    "version": "1.0.45",
+    "version": "1.0.46",
     "description": "Auto-generated from src/routes/**/+server.ts by scripts/generate-openapi.ts. Path, HTTP method, tag, and auth requirement are derived automatically from the route tree and hooks.server.ts PUBLIC_PATHS. Parameters, response status codes, and request body fields are additionally auto-detected from each handler’s own source (query params via url.searchParams, status codes via status:/error(), body fields via destructuring) — adding a new endpoint therefore requires ZERO manual spec edits to show up with real params/responses. An optional, additive `@openapi` JSDoc annotation on a handler replaces the generic auto-descriptions with hand-written summaries, exact types, and examples."
   },
   "servers": [
@@ -4276,6 +4276,12 @@
                       "type": "object",
                       "properties": {}
                     }
+                  },
+                  "restoreSecrets": {
+                    "type": "boolean"
+                  },
+                  "skipStackFiles": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -4343,6 +4349,37 @@
                   },
                   "targetEnvId": {
                     "type": "integer"
+                  },
+                  "environmentId": {
+                    "type": "integer"
+                  },
+                  "mode": {
+                    "type": "string"
+                  },
+                  "targetType": {
+                    "type": "string"
+                  },
+                  "targetName": {
+                    "type": "string"
+                  },
+                  "targetPath": {
+                    "type": "string"
+                  },
+                  "volumeDestinations": {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  "volumes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "skipStackFiles": {
+                    "type": "boolean"
+                  },
+                  "mergeStackFiles": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -4354,7 +4391,18 @@
                 "destinationId": 0,
                 "snapshotId": "string",
                 "includeTargets": true,
-                "targetEnvId": 0
+                "targetEnvId": 0,
+                "environmentId": 0,
+                "mode": "string",
+                "targetType": "string",
+                "targetName": "string",
+                "targetPath": "string",
+                "volumeDestinations": {},
+                "volumes": [
+                  "string"
+                ],
+                "skipStackFiles": true,
+                "mergeStackFiles": true
               }
             }
           }
@@ -6872,7 +6920,7 @@
             "description": "Directory listing (entries with name, type, size and permission metadata)"
           },
           "403": {
-            "description": "Permission denied"
+            "description": "Permission denied (needs containers:exec)"
           },
           "404": {
             "description": "Container not found"
@@ -7075,7 +7123,7 @@
             "description": "Path is missing, the target is a directory, or the container is not running"
           },
           "403": {
-            "description": "Permission denied to read the file"
+            "description": "Permission denied to read the file (needs containers:exec)"
           },
           "404": {
             "description": "File not found"
@@ -9473,7 +9521,8 @@
                             "type": "boolean"
                           },
                           "newerVersion": {
-                            "type": "string"
+                            "type": "object",
+                            "properties": {}
                           }
                         },
                         "required": [
@@ -9500,7 +9549,7 @@
                       "currentImage": "string",
                       "checkedAt": "string",
                       "hasImageUpdate": true,
-                      "newerVersion": "string"
+                      "newerVersion": {}
                     }
                   ]
                 }
@@ -10028,7 +10077,8 @@
                       "type": "string"
                     },
                     "uptime": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     },
                     "gcForced": {
                       "type": "boolean"
@@ -10037,19 +10087,24 @@
                       "type": "boolean"
                     },
                     "process": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     },
                     "growth": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     },
                     "v8Heap": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     },
                     "system": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     },
                     "rssTracker": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     }
                   },
                   "required": [
@@ -10090,7 +10145,7 @@
             }
           },
           "403": {
-            "description": "Memory monitor not enabled (set MEMORY_MONITOR=true)"
+            "description": "Memory monitor not enabled (set MEMORY_MONITOR=true), or the caller is not an admin"
           }
         },
         "security": [
@@ -11979,6 +12034,9 @@
               }
             }
           },
+          "403": {
+            "description": "Permission denied"
+          },
           "404": {
             "description": "Environment not found"
           }
@@ -12474,6 +12532,9 @@
           },
           "400": {
             "description": "Host is required for direct/hawser-standard connection types"
+          },
+          "403": {
+            "description": "The caller cannot access the environment named by environmentId"
           }
         },
         "security": [
@@ -12484,6 +12545,7 @@
             "bearerAuth": []
           }
         ],
+        "description": "Pass environmentId to fall back to that saved environment's stored secrets (hawserToken, tlsKey) for any secret field left blank in the body, so Test connection works when editing without re-entering the token.",
         "requestBody": {
           "required": true,
           "content": {
@@ -12520,6 +12582,9 @@
                   },
                   "hawserToken": {
                     "type": "string"
+                  },
+                  "environmentId": {
+                    "type": "integer"
                   }
                 },
                 "required": [
@@ -12587,7 +12652,8 @@
                     "branches": {
                       "type": "array",
                       "items": {
-                        "type": "string"
+                        "type": "object",
+                        "properties": {}
                       }
                     }
                   },
@@ -13165,10 +13231,12 @@
                   "type": "object",
                   "properties": {
                     "vars": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     },
                     "sources": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     }
                   },
                   "required": [
@@ -13177,8 +13245,8 @@
                   ]
                 },
                 "example": {
-                  "vars": "string",
-                  "sources": "string"
+                  "vars": {},
+                  "sources": {}
                 }
               }
             }
@@ -14489,7 +14557,8 @@
                   "type": "object",
                   "properties": {
                     "vars": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     }
                   },
                   "required": [
@@ -14933,7 +15002,23 @@
           }
         },
         "security": [],
-        "description": "Public endpoint authenticated by the repository's webhook secret via `X-Hub-Signature-256` (GitHub) or `X-Gitlab-Token` (GitLab); the raw request body is used for HMAC verification. A secret is required by default; set ALLOW_WEBHOOKS_WITHOUT_SECRET=true to accept a secret-less trigger on an isolated network."
+        "description": "Public endpoint authenticated by the repository's webhook secret via `X-Hub-Signature-256` (GitHub) or `X-Gitlab-Token` (GitLab); the raw request body is used for HMAC verification. A secret is required by default; set ALLOW_WEBHOOKS_WITHOUT_SECRET=true to accept a secret-less trigger on an isolated network.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "type": "string"
+                  }
+                },
+                "description": "Fields auto-detected from the handler's destructuring of the request body - generic string type, no @openapi annotation for this body yet."
+              }
+            }
+          }
+        }
       }
     },
     "/api/hawser/connect": {
@@ -15478,7 +15563,8 @@
                       "type": "integer"
                     },
                     "environment": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     }
                   },
                   "required": [
@@ -15588,7 +15674,8 @@
                   "type": "object",
                   "properties": {
                     "icons": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     }
                   },
                   "required": [
@@ -16346,7 +16433,8 @@
                       "type": "boolean"
                     },
                     "result": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     }
                   },
                   "required": [
@@ -16506,7 +16594,7 @@
         "tags": [
           "jobs"
         ],
-        "summary": "Poll a background job's status and accumulated output lines (no auth — job ids are unguessable UUIDs)",
+        "summary": "Poll a background job's status and accumulated output lines (owner or admin only)",
         "parameters": [
           {
             "name": "id",
@@ -16590,7 +16678,7 @@
         "tags": [
           "jobs"
         ],
-        "summary": "Request cancellation of a running background job (no auth — job ids are unguessable UUIDs)",
+        "summary": "Request cancellation of a running background job (owner or admin only)",
         "parameters": [
           {
             "name": "id",
@@ -16623,6 +16711,9 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Job not found"
           }
         },
         "security": [
@@ -18500,6 +18591,9 @@
           },
           "400": {
             "description": "Invalid ID (not a number)"
+          },
+          "403": {
+            "description": "Permission denied (needs notifications:edit)"
           },
           "404": {
             "description": "Notification setting not found"
@@ -21008,6 +21102,9 @@
           "400": {
             "description": "Missing registry parameter, or Docker Hub was targeted (catalog listing unsupported)"
           },
+          "403": {
+            "description": "Permission denied (requires registries:view)"
+          },
           "404": {
             "description": "Registry not found, or the registry does not implement the V2 catalog API"
           },
@@ -21206,6 +21303,9 @@
           "400": {
             "description": "The term query parameter is missing"
           },
+          "403": {
+            "description": "Permission denied (requires registries:view)"
+          },
           "404": {
             "description": "The referenced registry does not exist"
           },
@@ -21291,6 +21391,9 @@
           },
           "400": {
             "description": "image and tag are required"
+          },
+          "403": {
+            "description": "Permission denied (requires registries:view)"
           },
           "404": {
             "description": "Registry not found"
@@ -21425,6 +21528,9 @@
           },
           "400": {
             "description": "The image query parameter is missing"
+          },
+          "403": {
+            "description": "Permission denied (requires registries:view)"
           },
           "404": {
             "description": "The referenced registry does not exist"
@@ -22788,7 +22894,8 @@
                     "type": "string"
                   },
                   "config": {
-                    "type": "string"
+                    "type": "object",
+                    "properties": {}
                   }
                 },
                 "required": [
@@ -22800,7 +22907,7 @@
               "example": {
                 "name": "string",
                 "type": "string",
-                "config": "string"
+                "config": {}
               }
             }
           }
@@ -22843,21 +22950,46 @@
                       "type": "string"
                     },
                     "config": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
+                    },
+                    "stacksUsing": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "stackName": {
+                            "type": "string"
+                          },
+                          "environmentId": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "stackName"
+                        ]
+                      }
                     }
                   },
                   "required": [
                     "id",
                     "name",
                     "type",
-                    "config"
+                    "config",
+                    "stacksUsing"
                   ]
                 },
                 "example": {
                   "id": 0,
                   "name": "string",
                   "type": "string",
-                  "config": "string"
+                  "config": {},
+                  "stacksUsing": [
+                    {
+                      "stackName": "string",
+                      "environmentId": 0
+                    }
+                  ]
                 }
               }
             }
@@ -22965,14 +23097,15 @@
                     "type": "string"
                   },
                   "config": {
-                    "type": "string"
+                    "type": "object",
+                    "properties": {}
                   }
                 }
               },
               "example": {
                 "name": "string",
                 "type": "string",
-                "config": "string"
+                "config": {}
               }
             }
           }
@@ -23219,7 +23352,8 @@
                 "type": "object",
                 "properties": {
                   "config": {
-                    "type": "string"
+                    "type": "object",
+                    "properties": {}
                   }
                 }
               },
@@ -23294,7 +23428,8 @@
                     "type": "string"
                   },
                   "config": {
-                    "type": "string"
+                    "type": "object",
+                    "properties": {}
                   }
                 },
                 "required": [
@@ -23602,6 +23737,138 @@
                   },
                   "externalStackPaths": {
                     "type": "string"
+                  },
+                  "actionIconSize": {
+                    "type": "string"
+                  },
+                  "compactPorts": {
+                    "type": "boolean"
+                  },
+                  "confirmDestructive": {
+                    "type": "boolean"
+                  },
+                  "dateFormat": {
+                    "type": "string"
+                  },
+                  "defaultBackupImage": {
+                    "type": "string"
+                  },
+                  "defaultComposeTemplate": {
+                    "type": "string"
+                  },
+                  "defaultGrypeArgs": {
+                    "type": "string"
+                  },
+                  "defaultGrypeImage": {
+                    "type": "string"
+                  },
+                  "defaultScannerDns": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "defaultScannerNetworkMode": {
+                    "type": "string"
+                  },
+                  "defaultTrivyArgs": {
+                    "type": "string"
+                  },
+                  "defaultTrivyImage": {
+                    "type": "string"
+                  },
+                  "downloadFormat": {
+                    "type": "string"
+                  },
+                  "editorFont": {
+                    "type": "string"
+                  },
+                  "eventCleanupCron": {
+                    "type": "string"
+                  },
+                  "eventCleanupEnabled": {
+                    "type": "boolean"
+                  },
+                  "eventCollectionMode": {
+                    "type": "string"
+                  },
+                  "eventPollInterval": {
+                    "type": "integer"
+                  },
+                  "eventRetentionDays": {
+                    "type": "integer"
+                  },
+                  "font": {
+                    "type": "string"
+                  },
+                  "fontSize": {
+                    "type": "string"
+                  },
+                  "formatLogTimestamps": {
+                    "type": "boolean"
+                  },
+                  "gridFontSize": {
+                    "type": "string"
+                  },
+                  "highlightUpdates": {
+                    "type": "boolean"
+                  },
+                  "honorProxyLabels": {
+                    "type": "boolean"
+                  },
+                  "labelFilterMode": {
+                    "type": "string"
+                  },
+                  "logMaxLines": {
+                    "type": "integer"
+                  },
+                  "metricsCollectionInterval": {
+                    "type": "integer"
+                  },
+                  "primaryStackLocation": {
+                    "type": "string"
+                  },
+                  "protectScannerImages": {
+                    "type": "boolean"
+                  },
+                  "scannerCleanupCron": {
+                    "type": "string"
+                  },
+                  "scannerCleanupEnabled": {
+                    "type": "boolean"
+                  },
+                  "scheduleCleanupCron": {
+                    "type": "string"
+                  },
+                  "scheduleCleanupEnabled": {
+                    "type": "boolean"
+                  },
+                  "scheduleRetentionDays": {
+                    "type": "integer"
+                  },
+                  "showExposedPorts": {
+                    "type": "boolean"
+                  },
+                  "showGitCommitHash": {
+                    "type": "boolean"
+                  },
+                  "showImageChangelogLinks": {
+                    "type": "boolean"
+                  },
+                  "showStoppedContainers": {
+                    "type": "boolean"
+                  },
+                  "showWhatsNew": {
+                    "type": "boolean"
+                  },
+                  "terminalFont": {
+                    "type": "string"
+                  },
+                  "timeFormat": {
+                    "type": "string"
+                  },
+                  "useSelfhstIcons": {
+                    "type": "boolean"
                   }
                 }
               },
@@ -23613,7 +23880,52 @@
                 "darkTheme": "string",
                 "defaultTimezone": "string",
                 "logBufferSizeKb": 0,
-                "externalStackPaths": "string"
+                "externalStackPaths": "string",
+                "actionIconSize": "string",
+                "compactPorts": true,
+                "confirmDestructive": true,
+                "dateFormat": "string",
+                "defaultBackupImage": "string",
+                "defaultComposeTemplate": "string",
+                "defaultGrypeArgs": "string",
+                "defaultGrypeImage": "string",
+                "defaultScannerDns": [
+                  "string"
+                ],
+                "defaultScannerNetworkMode": "string",
+                "defaultTrivyArgs": "string",
+                "defaultTrivyImage": "string",
+                "downloadFormat": "string",
+                "editorFont": "string",
+                "eventCleanupCron": "string",
+                "eventCleanupEnabled": true,
+                "eventCollectionMode": "string",
+                "eventPollInterval": 0,
+                "eventRetentionDays": 0,
+                "font": "string",
+                "fontSize": "string",
+                "formatLogTimestamps": true,
+                "gridFontSize": "string",
+                "highlightUpdates": true,
+                "honorProxyLabels": true,
+                "labelFilterMode": "string",
+                "logMaxLines": 0,
+                "metricsCollectionInterval": 0,
+                "primaryStackLocation": "string",
+                "protectScannerImages": true,
+                "scannerCleanupCron": "string",
+                "scannerCleanupEnabled": true,
+                "scheduleCleanupCron": "string",
+                "scheduleCleanupEnabled": true,
+                "scheduleRetentionDays": 0,
+                "showExposedPorts": true,
+                "showGitCommitHash": true,
+                "showImageChangelogLinks": true,
+                "showStoppedContainers": true,
+                "showWhatsNew": true,
+                "terminalFont": "string",
+                "timeFormat": "string",
+                "useSelfhstIcons": true
               }
             }
           }
@@ -23907,6 +24219,12 @@
                   },
                   "envId": {
                     "type": "integer"
+                  },
+                  "grypeImage": {
+                    "type": "string"
+                  },
+                  "trivyImage": {
+                    "type": "string"
                   }
                 }
               },
@@ -24291,7 +24609,7 @@
             "schema": {
               "type": "integer"
             },
-            "description": "Target environment id"
+            "description": "Target environment id (takes precedence over envId/environmentId in the body)"
           }
         ],
         "responses": {
@@ -24316,7 +24634,7 @@
             "bearerAuth": []
           }
         ],
-        "description": "Writes the compose + .env to the stack dir, stores secrets in the DB, and with start deploys it. Can bind a secret provider.",
+        "description": "Writes the compose + .env to the stack dir, stores secrets in the DB, and with start deploys it. Can bind a secret provider. Target environment comes from the env query param, or from envId/environmentId in the body when the query is absent.",
         "requestBody": {
           "required": true,
           "content": {
@@ -24339,7 +24657,8 @@
                   "envVars": {
                     "type": "array",
                     "items": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     }
                   },
                   "rawEnvContent": {
@@ -24350,6 +24669,12 @@
                   },
                   "start": {
                     "type": "boolean"
+                  },
+                  "envId": {
+                    "type": "integer"
+                  },
+                  "environmentId": {
+                    "type": "integer"
                   }
                 },
                 "required": [
@@ -24363,11 +24688,13 @@
                 "composePath": "string",
                 "envPath": "string",
                 "envVars": [
-                  "string"
+                  {}
                 ],
                 "rawEnvContent": "string",
                 "secretProviderId": 0,
-                "start": true
+                "start": true,
+                "envId": 0,
+                "environmentId": 0
               }
             }
           }
@@ -24521,6 +24848,9 @@
                       "type": "integer"
                     },
                     "currentComposePath": {
+                      "type": "string"
+                    },
+                    "persistenceWarning": {
                       "type": "string"
                     }
                   },
@@ -25036,7 +25366,8 @@
                       }
                     },
                     "secretProvider": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     }
                   },
                   "required": [
@@ -25054,7 +25385,7 @@
                   "injectedSecretKeys": [
                     "string"
                   ],
-                  "secretProvider": "string"
+                  "secretProvider": {}
                 }
               }
             }
@@ -25791,7 +26122,10 @@
             "description": "oldDir and newComposePath are required, or the source directory does not exist"
           },
           "403": {
-            "description": "Permission denied (requires stacks:edit)"
+            "description": "Permission denied (requires stacks:edit), or a supplied path is not allowed"
+          },
+          "404": {
+            "description": "No stack source row for this name and environment"
           },
           "500": {
             "description": "Failed to relocate stack"
@@ -26076,7 +26410,8 @@
                             "type": "integer"
                           },
                           "fix": {
-                            "type": "string"
+                            "type": "object",
+                            "properties": {}
                           },
                           "fixDescription": {
                             "type": "string"
@@ -26149,6 +26484,7 @@
             "bearerAuth": []
           }
         ],
+        "description": "Set existing:true when validating an already-deployed stack, so the stack's own running containers/ports are excluded from the cross-stack collision checks; omit it (or false) for a brand-new stack, where a name/port clash with a running stack of the same name must still be reported.",
         "requestBody": {
           "required": true,
           "content": {
@@ -26158,6 +26494,9 @@
                 "properties": {
                   "compose": {
                     "type": "string"
+                  },
+                  "existing": {
+                    "type": "boolean"
                   },
                   "config": {
                     "type": "object",
@@ -26169,12 +26508,14 @@
                         }
                       },
                       "severity": {
-                        "type": "string"
+                        "type": "object",
+                        "properties": {}
                       }
                     }
                   },
                   "envVars": {
-                    "type": "string"
+                    "type": "object",
+                    "properties": {}
                   }
                 },
                 "required": [
@@ -26782,19 +27123,24 @@
                   "type": "object",
                   "properties": {
                     "docker": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     },
                     "host": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     },
                     "runtime": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     },
                     "database": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     },
                     "stats": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     }
                   },
                   "required": [
@@ -26880,7 +27226,8 @@
                   "type": "object",
                   "properties": {
                     "diskUsage": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     }
                   }
                 },
@@ -29460,7 +29807,8 @@
                     "findings": {
                       "type": "array",
                       "items": {
-                        "type": "string"
+                        "type": "object",
+                        "properties": {}
                       }
                     },
                     "total": {
@@ -29518,7 +29866,8 @@
                       "type": "integer"
                     },
                     "summary": {
-                      "type": "string"
+                      "type": "object",
+                      "properties": {}
                     },
                     "images": {
                       "type": "array",

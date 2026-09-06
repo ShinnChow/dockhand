@@ -4276,6 +4276,12 @@
                       "type": "object",
                       "properties": {}
                     }
+                  },
+                  "restoreSecrets": {
+                    "type": "boolean"
+                  },
+                  "skipStackFiles": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -4343,6 +4349,37 @@
                   },
                   "targetEnvId": {
                     "type": "integer"
+                  },
+                  "environmentId": {
+                    "type": "integer"
+                  },
+                  "mode": {
+                    "type": "string"
+                  },
+                  "targetType": {
+                    "type": "string"
+                  },
+                  "targetName": {
+                    "type": "string"
+                  },
+                  "targetPath": {
+                    "type": "string"
+                  },
+                  "volumeDestinations": {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  "volumes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "skipStackFiles": {
+                    "type": "boolean"
+                  },
+                  "mergeStackFiles": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -4354,7 +4391,18 @@
                 "destinationId": 0,
                 "snapshotId": "string",
                 "includeTargets": true,
-                "targetEnvId": 0
+                "targetEnvId": 0,
+                "environmentId": 0,
+                "mode": "string",
+                "targetType": "string",
+                "targetName": "string",
+                "targetPath": "string",
+                "volumeDestinations": {},
+                "volumes": [
+                  "string"
+                ],
+                "skipStackFiles": true,
+                "mergeStackFiles": true
               }
             }
           }
@@ -14954,7 +15002,23 @@
           }
         },
         "security": [],
-        "description": "Public endpoint authenticated by the repository's webhook secret via `X-Hub-Signature-256` (GitHub) or `X-Gitlab-Token` (GitLab); the raw request body is used for HMAC verification. A secret is required by default; set ALLOW_WEBHOOKS_WITHOUT_SECRET=true to accept a secret-less trigger on an isolated network."
+        "description": "Public endpoint authenticated by the repository's webhook secret via `X-Hub-Signature-256` (GitHub) or `X-Gitlab-Token` (GitLab); the raw request body is used for HMAC verification. A secret is required by default; set ALLOW_WEBHOOKS_WITHOUT_SECRET=true to accept a secret-less trigger on an isolated network.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "type": "string"
+                  }
+                },
+                "description": "Fields auto-detected from the handler's destructuring of the request body - generic string type, no @openapi annotation for this body yet."
+              }
+            }
+          }
+        }
       }
     },
     "/api/hawser/connect": {
@@ -23673,6 +23737,138 @@
                   },
                   "externalStackPaths": {
                     "type": "string"
+                  },
+                  "actionIconSize": {
+                    "type": "string"
+                  },
+                  "compactPorts": {
+                    "type": "boolean"
+                  },
+                  "confirmDestructive": {
+                    "type": "boolean"
+                  },
+                  "dateFormat": {
+                    "type": "string"
+                  },
+                  "defaultBackupImage": {
+                    "type": "string"
+                  },
+                  "defaultComposeTemplate": {
+                    "type": "string"
+                  },
+                  "defaultGrypeArgs": {
+                    "type": "string"
+                  },
+                  "defaultGrypeImage": {
+                    "type": "string"
+                  },
+                  "defaultScannerDns": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "defaultScannerNetworkMode": {
+                    "type": "string"
+                  },
+                  "defaultTrivyArgs": {
+                    "type": "string"
+                  },
+                  "defaultTrivyImage": {
+                    "type": "string"
+                  },
+                  "downloadFormat": {
+                    "type": "string"
+                  },
+                  "editorFont": {
+                    "type": "string"
+                  },
+                  "eventCleanupCron": {
+                    "type": "string"
+                  },
+                  "eventCleanupEnabled": {
+                    "type": "boolean"
+                  },
+                  "eventCollectionMode": {
+                    "type": "string"
+                  },
+                  "eventPollInterval": {
+                    "type": "integer"
+                  },
+                  "eventRetentionDays": {
+                    "type": "integer"
+                  },
+                  "font": {
+                    "type": "string"
+                  },
+                  "fontSize": {
+                    "type": "string"
+                  },
+                  "formatLogTimestamps": {
+                    "type": "boolean"
+                  },
+                  "gridFontSize": {
+                    "type": "string"
+                  },
+                  "highlightUpdates": {
+                    "type": "boolean"
+                  },
+                  "honorProxyLabels": {
+                    "type": "boolean"
+                  },
+                  "labelFilterMode": {
+                    "type": "string"
+                  },
+                  "logMaxLines": {
+                    "type": "integer"
+                  },
+                  "metricsCollectionInterval": {
+                    "type": "integer"
+                  },
+                  "primaryStackLocation": {
+                    "type": "string"
+                  },
+                  "protectScannerImages": {
+                    "type": "boolean"
+                  },
+                  "scannerCleanupCron": {
+                    "type": "string"
+                  },
+                  "scannerCleanupEnabled": {
+                    "type": "boolean"
+                  },
+                  "scheduleCleanupCron": {
+                    "type": "string"
+                  },
+                  "scheduleCleanupEnabled": {
+                    "type": "boolean"
+                  },
+                  "scheduleRetentionDays": {
+                    "type": "integer"
+                  },
+                  "showExposedPorts": {
+                    "type": "boolean"
+                  },
+                  "showGitCommitHash": {
+                    "type": "boolean"
+                  },
+                  "showImageChangelogLinks": {
+                    "type": "boolean"
+                  },
+                  "showStoppedContainers": {
+                    "type": "boolean"
+                  },
+                  "showWhatsNew": {
+                    "type": "boolean"
+                  },
+                  "terminalFont": {
+                    "type": "string"
+                  },
+                  "timeFormat": {
+                    "type": "string"
+                  },
+                  "useSelfhstIcons": {
+                    "type": "boolean"
                   }
                 }
               },
@@ -23684,7 +23880,52 @@
                 "darkTheme": "string",
                 "defaultTimezone": "string",
                 "logBufferSizeKb": 0,
-                "externalStackPaths": "string"
+                "externalStackPaths": "string",
+                "actionIconSize": "string",
+                "compactPorts": true,
+                "confirmDestructive": true,
+                "dateFormat": "string",
+                "defaultBackupImage": "string",
+                "defaultComposeTemplate": "string",
+                "defaultGrypeArgs": "string",
+                "defaultGrypeImage": "string",
+                "defaultScannerDns": [
+                  "string"
+                ],
+                "defaultScannerNetworkMode": "string",
+                "defaultTrivyArgs": "string",
+                "defaultTrivyImage": "string",
+                "downloadFormat": "string",
+                "editorFont": "string",
+                "eventCleanupCron": "string",
+                "eventCleanupEnabled": true,
+                "eventCollectionMode": "string",
+                "eventPollInterval": 0,
+                "eventRetentionDays": 0,
+                "font": "string",
+                "fontSize": "string",
+                "formatLogTimestamps": true,
+                "gridFontSize": "string",
+                "highlightUpdates": true,
+                "honorProxyLabels": true,
+                "labelFilterMode": "string",
+                "logMaxLines": 0,
+                "metricsCollectionInterval": 0,
+                "primaryStackLocation": "string",
+                "protectScannerImages": true,
+                "scannerCleanupCron": "string",
+                "scannerCleanupEnabled": true,
+                "scheduleCleanupCron": "string",
+                "scheduleCleanupEnabled": true,
+                "scheduleRetentionDays": 0,
+                "showExposedPorts": true,
+                "showGitCommitHash": true,
+                "showImageChangelogLinks": true,
+                "showStoppedContainers": true,
+                "showWhatsNew": true,
+                "terminalFont": "string",
+                "timeFormat": "string",
+                "useSelfhstIcons": true
               }
             }
           }
@@ -23978,6 +24219,12 @@
                   },
                   "envId": {
                     "type": "integer"
+                  },
+                  "grypeImage": {
+                    "type": "string"
+                  },
+                  "trivyImage": {
+                    "type": "string"
                   }
                 }
               },
