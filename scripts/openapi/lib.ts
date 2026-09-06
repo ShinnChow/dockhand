@@ -550,10 +550,28 @@ export function analyzeHandlerBody(body: string, pathParamNames: string[] = []):
 
 	const bodyFields = new Set<string>();
 	// `const { a, b } = await request.json();` and `const { a, b } = body;`
-	const destructureRe = /const\s*\{([^}]*)\}\s*=\s*(?:await\s+)?(?:request\.json\(\)|body)\b/g;
+	// The `\b(?!\.)` guards the bare `body` alternative: it must not match `bodyText`
+	// (\b) NOR `body.config` (the (?!\.) - destructuring a NESTED object off the body
+	// would otherwise record its keys as top-level fields). `request.json()` ends in
+	// `)`, where a trailing boundary would never match, so it needs no guard.
+	const destructureRe = /const\s*\{([^}]*)\}\s*=\s*(?:await\s+)?(?:request\.json\(\)|body\b(?!\.))/g;
 	let dm;
 	while ((dm = destructureRe.exec(body)) !== null) {
 		for (const f of parseDestructuredFields(dm[1])) bodyFields.add(f);
+	}
+	// Member access: `body.foo` / `body?.foo`. Many handlers read the parsed body
+	// field-by-field instead of destructuring, so without this a documented `body:`
+	// annotation could omit a field the code actually reads and drift silently.
+	// Skip a WRITE (`body.foo = ...` and compound `+= ??= ||= &&= *= ...`): the request
+	// body is only ever read, so an assignment means `body` is a local variable (e.g. a
+	// response object literally named `body`), not the parsed request - counting it is a
+	// false positive. The write group matches an optional assignment operator (any op
+	// suffix ending in a single `=`) but NOT a comparison `==`/`===`.
+	const memberRe = /\bbody\??\.([A-Za-z_$][\w$]*)\s*((?:\*\*|<<|>>>?|\?\?|\|\||&&|[+\-*/%&|^])?=(?!=))?/g;
+	let mm;
+	while ((mm = memberRe.exec(body)) !== null) {
+		if (mm[2]) continue; // an assignment (plain or compound) -> a write, skip
+		bodyFields.add(mm[1]);
 	}
 
 	return {
