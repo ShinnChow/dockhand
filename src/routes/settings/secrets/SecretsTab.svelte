@@ -214,6 +214,7 @@
 										itemName={provider.name}
 										title="Remove"
 										position="left"
+										autoHideMs={0}
 										onConfirm={() =>
 											deleteProvider(provider.id)}
 										onOpenChange={(open) => {
