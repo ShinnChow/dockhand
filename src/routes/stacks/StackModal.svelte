@@ -136,6 +136,11 @@
 	const selectedProviderName = $derived(
 		secretProviders.find((p) => p.id === formSecretProviderId)?.name ?? null
 	);
+	// Whether a provider is currently bound AND still exists (a deleted provider leaves
+	// formSecretProviderId pointing at a gone id) - drives the historical banner (#1522).
+	const selectedProviderBound = $derived(
+		formSecretProviderId != null && secretProviders.some((p) => p.id === formSecretProviderId)
+	);
 	// Live probe of the bound provider: key NAMES currently present (bulk + resolved
 	// inline refs). Drives the editor's green IN VAULT marker. Empty when no provider
 	// is bound or the probe failed; probeError holds the reason on failure.
@@ -454,6 +459,43 @@
 	let changeLocationFileCount = $state(0);
 	let changeLocationOldDir = $state<string | null>(null);
 	let movingLocation = $state(false);
+	// Persistence warning: the chosen compose path is not under a Dockhand mount, so it
+	// would vanish on a container recreate (#1524). Shown as a confirm before committing.
+	let showPersistenceWarn = $state(false);
+	let persistenceWarnText = $state('');
+	let pendingHasFilesToMove = $state(false);
+	// Continuation run when the user accepts the persistence warning ("Use it anyway").
+	// Lets create / save / relocate share one dialog: each stashes what to do next.
+	let persistenceWarnProceed: (() => void) | null = null;
+
+	/**
+	 * Pre-flight a compose path: if it is not under a Dockhand mount (would be lost on
+	 * recreate, #1524), show the warning dialog and defer `proceed` until the user accepts;
+	 * otherwise run `proceed` immediately. On any check failure, proceed (never block on the
+	 * guard itself). Only meaningful for an absolute custom path.
+	 */
+	async function guardComposePersistence(composePath: string, proceed: () => void) {
+		const envId = $currentEnvironment?.id ?? null;
+		const probeName = mode === 'edit' ? stackName : (newStackName.trim() || 'new-stack');
+		try {
+			const res = await fetch(
+				appendEnvParam(`/api/stacks/${encodeURIComponent(probeName)}/check-path-change`, envId),
+				{ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ newComposePath: composePath }) }
+			);
+			if (res.ok) {
+				const data = await res.json();
+				if (data.persistenceWarning) {
+					persistenceWarnText = data.persistenceWarning;
+					persistenceWarnProceed = proceed;
+					showPersistenceWarn = true;
+					return;
+				}
+			}
+		} catch (e) {
+			console.warn('Persistence pre-flight failed:', e);
+		}
+		proceed();
+	}
 
 	async function handleChangeLocation(selectedDir: string, _name: string) {
 		showFileBrowser = false;
@@ -482,13 +524,22 @@
 
 			if (response.ok) {
 				const data = await response.json();
-				if (data.hasChanges && data.oldDir && data.fileCount > 0) {
-					// Show confirmation dialog
-					pendingNewLocation = newDir;
-					pendingNewComposePath = newComposePath;
-					pendingNewEnvPath = newEnvPath;
-					changeLocationOldDir = data.oldDir;
-					changeLocationFileCount = data.fileCount;
+				// Stash the target so a follow-up confirm (persistence and/or move) can act on it.
+				pendingNewLocation = newDir;
+				pendingNewComposePath = newComposePath;
+				pendingNewEnvPath = newEnvPath;
+				changeLocationOldDir = data.oldDir ?? null;
+				changeLocationFileCount = data.fileCount ?? 0;
+				pendingHasFilesToMove = !!(data.hasChanges && data.oldDir && data.fileCount > 0);
+
+				// A non-persisted path is the more serious warning - confirm it FIRST; on
+				// confirm we fall through to the move dialog (if any) or commit (#1524).
+				if (data.persistenceWarning) {
+					persistenceWarnText = data.persistenceWarning;
+					showPersistenceWarn = true;
+					return;
+				}
+				if (pendingHasFilesToMove) {
 					showChangeLocationConfirm = true;
 					return;
 				}
@@ -501,6 +552,41 @@
 		workingComposePath = newComposePath;
 		workingEnvPath = newEnvPath;
 		isDirty = true;
+	}
+
+	// "Use it anyway". A continuation (create/save) runs first; otherwise this is the
+	// change-location flow, so continue to the move dialog or commit the new path.
+	function confirmPersistenceWarn() {
+		showPersistenceWarn = false;
+		if (persistenceWarnProceed) {
+			const go = persistenceWarnProceed;
+			persistenceWarnProceed = null;
+			go();
+			return;
+		}
+		if (pendingHasFilesToMove) {
+			showChangeLocationConfirm = true;
+			return;
+		}
+		if (pendingNewComposePath) workingComposePath = pendingNewComposePath;
+		if (pendingNewEnvPath !== null) workingEnvPath = pendingNewEnvPath;
+		isDirty = true;
+		clearPendingLocation();
+	}
+
+	function cancelPersistenceWarn() {
+		showPersistenceWarn = false;
+		persistenceWarnProceed = null;
+		clearPendingLocation();
+	}
+
+	function clearPendingLocation() {
+		pendingNewLocation = null;
+		pendingNewComposePath = null;
+		pendingNewEnvPath = null;
+		changeLocationOldDir = null;
+		changeLocationFileCount = 0;
+		pendingHasFilesToMove = false;
 	}
 
 	function cancelChangeLocation() {
@@ -1247,7 +1333,7 @@
 		composeContent = newContent;
 	}
 
-	async function handleCreate(start: boolean = false) {
+	async function handleCreate(start: boolean = false, persistenceAcked = false) {
 		errors = {};
 		let hasErrors = false;
 
@@ -1266,6 +1352,11 @@
 		}
 
 		if (hasErrors) return;
+
+		// Warn if the chosen compose path won't survive a recreate (#1524) - before creating.
+		if (!persistenceAcked && workingComposePath.trim()) {
+			return guardComposePersistence(workingComposePath.trim(), () => handleCreate(start, true));
+		}
 
 		const envId = $currentEnvironment?.id ?? null;
 
@@ -1364,7 +1455,7 @@
 		}
 	}
 
-	async function handleSave(restart = false, moveFromDir: string | null | undefined = undefined) {
+	async function handleSave(restart = false, moveFromDir: string | null | undefined = undefined, persistenceAcked = false) {
 		errors = {};
 
 		// Validate compose content (unless file location is needed and we have a path)
@@ -1399,6 +1490,13 @@
 					);
 					if (checkResponse.ok) {
 						const checkData = await checkResponse.json();
+						// Non-persisted path is the more serious warning - surface it first (#1524).
+						if (checkData.persistenceWarning && !persistenceAcked) {
+							persistenceWarnText = checkData.persistenceWarning;
+							persistenceWarnProceed = () => handleSave(restart, moveFromDir, true);
+							showPersistenceWarn = true;
+							return;
+						}
 						if (checkData.hasChanges && checkData.oldDir && checkData.fileCount > 0) {
 							// Show confirmation dialog
 							pathChangeOldDir = checkData.oldDir;
@@ -2160,6 +2258,7 @@
 									injectedSecretKeys={mode === 'edit' ? injectedSecretKeys : []}
 									providerType={selectedProviderType}
 									providerName={selectedProviderName}
+									providerBound={selectedProviderBound}
 									{probeError}
 									{providerKeySet}
 									{readonly}
@@ -2348,6 +2447,29 @@
 			</Button>
 			<Button variant="default" size="sm" onclick={confirmBrowseAndLoad}>
 				Replace content
+			</Button>
+		</div>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Persistence warning: chosen compose path is not under a Dockhand mount (#1524) -->
+<Dialog.Root bind:open={showPersistenceWarn}>
+	<Dialog.Content class="max-w-lg">
+		<Dialog.Header>
+			<Dialog.Title class="flex items-center gap-2">
+				<TriangleAlert class="w-5 h-5 text-amber-500 shrink-0" />
+				This location isn't persisted
+			</Dialog.Title>
+		</Dialog.Header>
+		<p class="text-sm text-muted-foreground mt-1">
+			{persistenceWarnText}
+		</p>
+		<div class="flex justify-end gap-1.5 mt-4">
+			<Button variant="default" size="sm" onclick={cancelPersistenceWarn}>
+				Pick another location
+			</Button>
+			<Button variant="outline" size="sm" onclick={confirmPersistenceWarn}>
+				Use it anyway
 			</Button>
 		</div>
 	</Dialog.Content>
