@@ -19,7 +19,9 @@ import { jobResult } from '$lib/server/sse';
  */
 export const POST: RequestHandler = async ({ request, cookies }) => {
 	const auth = await authorize(cookies);
-	const rbacDenied = await requireBackups(auth, 'manage');
+	// Read-only: restic ls/dump + host probes, writes nothing (like snapshots dump/browse),
+	// so it gates on view. The actual restore (restore/+server.ts) still needs manage.
+	const rbacDenied = await requireBackups(auth, 'view');
 	if (rbacDenied) return rbacDenied;
 
 	const body = await request.json();
