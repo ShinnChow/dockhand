@@ -17,7 +17,7 @@ import { pumpWebStreamToWritable } from './stream-pump';
 import { toWebReadableStream } from './node-readable-stream';
 import { buildImagePruneFilters } from './image-prune-core';
 import { computeRequestTimeoutMs } from './backups/request-timeout';
-import { helperWaitDeadline } from './helper-wait-core';
+import { helperWaitDeadline, helperExitFromState } from './helper-wait-core';
 import type { Environment } from './db';
 import { getSetting } from './db';
 import { getAdditionalVolumeBinds, dedupeVolumesForRecreate } from './mount-dedupe';
@@ -5129,14 +5129,22 @@ export async function runContainerWithStreaming(options: {
 					try {
 						const insp = await dockerFetch(`/containers/${containerId}/json`, {}, options.envId);
 						if (insp.ok) {
-							const data = await insp.json() as { State?: { Status?: string; Running?: boolean; Dead?: boolean; ExitCode?: number } };
+							const data = await insp.json() as { State?: { Status?: string; Running?: boolean; Dead?: boolean; ExitCode?: number; Error?: string } };
 							const st = data.State;
-							if (st && st.Running === false && st.Status === 'exited' && typeof st.ExitCode === 'number') {
-								exitCode = st.ExitCode;
-								console.log(`[runContainerWithStreaming] Container exited with code: ${exitCode} (poll mode)`);
+							// Resolves for a normal `exited` AND for a container the daemon left
+							// terminally `created`/`dead` after a start failure (e.g. Docker 29.x
+							// exit 128 "failed to mount overlay: device or resource busy", #1487) -
+							// otherwise the unbounded poll waits forever for an `exited` that never comes.
+							const resolved = helperExitFromState(st);
+							if (resolved !== undefined) {
+								exitCode = resolved;
+								console.log(`[runContainerWithStreaming] Container exited with code: ${exitCode} (poll mode, status=${st?.Status})`);
 								break;
 							}
-							if (st?.Dead || st?.Status === 'removing') break; // gone -> fail-closed diagnostics below
+							// A `dead`/`removing` container that helperExitFromState didn't resolve
+							// (e.g. dead with a 0 exit and no Error) is still terminal - break to the
+							// fail-closed diagnostics rather than polling it to the deadline.
+							if (st?.Dead || st?.Status === 'removing') break;
 						} else if (insp.status === 404) {
 							console.warn(`[runContainerWithStreaming] Poll: ${options.name ?? containerId.slice(0, 12)} not found (404) — container removed`);
 							break;
@@ -5188,9 +5196,10 @@ export async function runContainerWithStreaming(options: {
 								StartedAt: st?.StartedAt, FinishedAt: st?.FinishedAt, Pid: st?.Pid,
 							})}`
 						);
-						if (st && st.Running === false && st.Status === 'exited' && typeof st.ExitCode === 'number') {
-							exitCode = st.ExitCode;
-							console.log(`[runContainerWithStreaming] Resolved exit code via inspect: ${exitCode}`);
+						const resolved = helperExitFromState(st);
+						if (resolved !== undefined) {
+							exitCode = resolved;
+							console.log(`[runContainerWithStreaming] Resolved exit code via inspect: ${exitCode} (status=${st?.Status})`);
 						}
 					} else {
 						console.warn(`[runContainerWithStreaming] EXIT-CODE INDETERMINATE for ${options.name ?? containerId.slice(0, 12)}: inspect returned HTTP ${insp.status} (container may already be gone/removed)`);
