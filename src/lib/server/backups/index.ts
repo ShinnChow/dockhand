@@ -128,9 +128,9 @@ async function planStackDirVolume(
 	| { kind: 'candidate'; syntheticVolume: DiscoveredVolume; volumeKey: string; composeFileName: string; excludePaths: string[]; bindSources: string[]; probeHint?: StackDirProbeHint }
 > {
 	const { getStackComposeFile } = await import('../stacks');
-	const { dirname, join, basename } = await import('path');
+	const { dirname, join, basename, resolve } = await import('path');
 	const { lstatSync } = await import('fs');
-	const { translateToHostPath, translateContainerPathViaMount, getOwnDockerHost, getAutoDetectedDockerHost } = await import('../host-path');
+	const { translateToHostPath, translateContainerPathViaMount, getOwnDockerHost, getAutoDetectedDockerHost, pathOverriddenBySubMount, getCachedContainerMounts } = await import('../host-path');
 	const { resolveHostStackDir, deriveStackDirFromBinds, trustBindDerivedForEnv, isLocalDaemon, STACKDIR_VOLUME_KEY } = await import('./stackdir-plan');
 	const { relativeBindDirsFromCompose, relativeBindsFromCompose } = await import('./stackfile-filter');
 
@@ -237,7 +237,14 @@ async function planStackDirVolume(
 	// mountHostPath: via a container bind mount (adopted/external stacks outside DATA_DIR).
 	// workingDirLabel: for hawser/matching-paths where the label already IS the host path.
 	const viaDataRaw = localDaemon && dockhandStackDir ? translateToHostPath(dockhandStackDir) : null;
-	const dataDirHostPath = viaDataRaw && viaDataRaw !== dockhandStackDir ? viaDataRaw : null;
+	// A separate bind mount at a subpath of DATA_DIR (e.g. /app/data/stacks -> some host dir)
+	// makes the DATA_DIR translation wrong - the files live under that bind, not the DATA_DIR
+	// volume root. In that case drop the DATA_DIR candidate so the resolver uses mountHostPath,
+	// which longest-prefix-matches the more specific bind and is correct (#1533).
+	const overriddenBySubMount = localDaemon && dockhandStackDir
+		? pathOverriddenBySubMount(dockhandStackDir, resolve(process.env.DATA_DIR || '/app/data'), getCachedContainerMounts())
+		: false;
+	const dataDirHostPath = viaDataRaw && viaDataRaw !== dockhandStackDir && !overriddenBySubMount ? viaDataRaw : null;
 	const mountHostPath = localDaemon && dockhandStackDir ? translateContainerPathViaMount(dockhandStackDir) : null;
 
 	const resolution = resolveHostStackDir({
