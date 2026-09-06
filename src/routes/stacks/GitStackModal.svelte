@@ -1365,6 +1365,7 @@
 					injectedSecretKeys={gitStack !== null ? injectedSecretKeys : []}
 					providerType={secretProviders.find((p) => p.id === formSecretProviderId)?.type ?? null}
 					providerName={secretProviders.find((p) => p.id === formSecretProviderId)?.name ?? null}
+					providerBound={formSecretProviderId != null && secretProviders.some((p) => p.id === formSecretProviderId)}
 					placeholder={{ key: 'MY_VAR', value: 'value' }}
 					infoText="Override variables from your repository env files. Non-secrets are saved to <code class='bg-muted px-1 rounded'>.env.dockhand</code> in the stack directory. Secrets are stored in the database and injected via shell environment at deploy time.<br/><br/>Variables are available for <strong>compose file interpolation</strong> using <code class='bg-muted px-1 rounded'>${'{VAR_NAME}'}</code> syntax. They are not automatically injected into containers — use <code class='bg-muted px-1 rounded'>environment:</code> or reference <code class='bg-muted px-1 rounded'>.env.dockhand</code> in <code class='bg-muted px-1 rounded'>env_file:</code> to pass them through."
 					existingSecretKeys={gitStack !== null ? existingSecretKeys : new Set()}

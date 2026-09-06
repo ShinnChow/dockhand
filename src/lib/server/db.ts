@@ -354,6 +354,20 @@ export async function getSecretProviderById(id: number): Promise<SecretProviderW
 	};
 }
 
+/** Lightweight existence check (no config decrypt), for validating a bound provider id. */
+export async function secretProviderExists(id: number): Promise<boolean> {
+	const rows = await db.select({ id: secretProviders.id }).from(secretProviders).where(eq(secretProviders.id, id));
+	return rows.length > 0;
+}
+
+/** Stacks currently bound to a secret provider, so a delete can warn which ones lose it. */
+export async function getStacksUsingSecretProvider(id: number): Promise<Array<{ stackName: string; environmentId: number | null }>> {
+	return db
+		.select({ stackName: stackSources.stackName, environmentId: stackSources.environmentId })
+		.from(stackSources)
+		.where(eq(stackSources.secretProviderId, id));
+}
+
 export async function createSecretProvider(data: {
 	type: SecretProviderType;
 	name: string;
